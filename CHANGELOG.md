@@ -5,13 +5,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-10-15
+
 ### Added
-- CurseForge project assets: logo (`icon.png`) and `docs/curseforge.md` (summary, categories, description).
-- CurseForge project ID in the toc.
 - Cast statuses (`cast`): one status per tracked spell, created under Statuses > Casts > New Cast like Buffs, with spell-name suggestions while typing. Each shows on the caster's Grid2 frame for a set duration after a successful cast, through icon, color, text and bar indicators; duration, color and icon are editable (#9).
+- CurseForge project assets: logo (`icon.png`), `docs/curseforge.md` and the project ID in the toc.
 
 ### Changed
-- Replaces the single `cast-tracker` status; saved `cast-tracker` spell lists are converted into separate cast statuses on load. Indicator links must be set again.
+- Replaces the pre-release single `cast-tracker` status; saved `cast-tracker` spell lists are converted into separate cast statuses on load. Indicator links must be set again.
 - No spells are tracked by default (#3).
 
-[Unreleased]: https://github.com/ehvd/Grid2Extensions/commits/develop
+[Unreleased]: https://github.com/ehvd/Grid2Extensions/compare/v0.1.0...develop
+[0.1.0]: https://github.com/ehvd/Grid2Extensions/compare/v0.0.1-alpha.1...v0.1.0

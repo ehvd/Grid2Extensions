@@ -25,6 +25,32 @@ local wipe = wipe
 -- Spell ID helpers
 ---------------------------------------------------------------------------------------------------------------
 
+-- Classic has no spell database API, so spell names are resolved from a lazily built index of the vanilla spell
+-- ID range: ids ascending (player abilities have low IDs) and their lowercased names.
+local SCAN_MAX_ID = 40000
+local indexIds, indexNames
+
+local function BuildIndex()
+	if indexIds then return end
+	indexIds, indexNames = {}, {}
+	for id = 1, SCAN_MAX_ID do
+		local name = GetSpellInfo(id)
+		if name and name ~= "" then
+			indexIds[#indexIds + 1] = id
+			indexNames[#indexNames + 1] = strlower(name)
+		end
+	end
+end
+
+-- First spell whose name is exactly `name` (case-insensitive), for names typed without picking a suggestion.
+local function FindSpellByName(name)
+	BuildIndex()
+	name = strlower(name)
+	for i = 1, #indexIds do
+		if indexNames[i] == name then return indexIds[i] end
+	end
+end
+
 -- "1161, 694" or "Challenging Shout" -> { ids }. Returns nil, badToken when something is not a known spell.
 local function ParseSpellIds(text)
 	local ids = {}
@@ -35,7 +61,7 @@ local function ParseSpellIds(text)
 			if id then
 				if not GetSpellInfo(id) then return nil, token end
 			else
-				id = select(7, GetSpellInfo(token))
+				id = FindSpellByName(token)
 				if not id then return nil, token end
 			end
 			ids[#ids + 1] = id
@@ -220,10 +246,59 @@ end
 -- Grid2Options (load-on-demand): "Casts" category with a "New Cast" page, like Buffs
 ---------------------------------------------------------------------------------------------------------------
 
+-- Suggestions while typing in a spell field (AceGUI-3.0-Search-EditBox predictor, the same widget Buffs use).
+-- Works on the last comma-separated token, so several spells can be typed into one field.
+local Predictor = {}
+
+local function SplitLastToken(text)
+	local head, tail = strmatch(text or "", "^(.*[,;]%s*)(.-)$")
+	if not head then head, tail = "", text or "" end
+	return head, strtrim(tail)
+end
+
+function Predictor:GetValues(text, values, max)
+	local _, token = SplitLastToken(text)
+	if token == "" then return end
+	local id = strmatch(token, "^%d+$") and tonumber(token)
+	if id then
+		local name, _, icon = GetSpellInfo(id)
+		if name then values[id] = format("|T%s:0|t%s, |cff808080%d|r", icon or "", name, id) end
+		return
+	end
+	if #token < 2 then return end
+	BuildIndex()
+	token = strlower(token)
+	local len = #token
+	for i = 1, #indexIds do
+		if strsub(indexNames[i], 1, len) == token then
+			local spellID = indexIds[i]
+			local name, _, icon = GetSpellInfo(spellID)
+			local rank = GetSpellSubtext and GetSpellSubtext(spellID)
+			values[spellID] = format("|T%s:0|t%s%s, |cff808080%d|r", icon or "", name,
+				rank and rank ~= "" and " (" .. rank .. ")" or "", spellID)
+			max = max - 1
+			if max == 0 then return end
+		end
+	end
+end
+
+-- Called with the typed text and, when the user picks a suggestion, its key (the spell ID).
+function Predictor:GetValue(text, key)
+	if key then
+		local head = SplitLastToken(text)
+		return key, head .. key
+	end
+	return text, text
+end
+
+function Predictor:GetHyperlink(key)
+	return "spell:" .. key
+end
+
 local function MakeStatusOptions(self, status, options)
 	local dbx = status.dbx
 	options.spellIds = {
-		type = "input", order = 10, width = "full", name = "Spell IDs",
+		type = "input", dialogControl = "EditBoxGrid2Casts", order = 10, width = "full", name = "Spell IDs",
 		desc = "Spell IDs or names, separated by commas. Classic has one ID per rank, so list every rank.",
 		get = function() return JoinSpellIds(dbx.spellIds) end,
 		validate = function(_, v)
@@ -260,10 +335,11 @@ local function MakeStatusOptions(self, status, options)
 end
 
 local function MakeCategoryOptions(Options)
-	local newSpells, newDuration = "", DEFAULT_DURATION
+	local newSpells = ""
 	return {
 		newCastSpells = {
-			type = "input", order = 5, width = "full", name = "Spell IDs or names",
+			type = "input", dialogControl = "EditBoxGrid2Casts", order = 5, width = "full", name = "Spell IDs or names",
+			usage = "Start typing a spell name to get suggestions, or enter spell IDs. Separate several spells with commas.",
 			desc = "Spell IDs or names, separated by commas. Classic has one ID per rank, so list every rank.",
 			get = function() return newSpells end,
 			set = function(_, v) newSpells = v end,
@@ -274,18 +350,12 @@ local function MakeCategoryOptions(Options)
 				return true
 			end,
 		},
-		newCastDuration = {
-			type = "range", order = 5.1, name = "Duration (s)", min = 0.5, max = 60, step = 0.5,
-			desc = "How long the icon stays visible after the cast.",
-			get = function() return newDuration end,
-			set = function(_, v) newDuration = v end,
-		},
 		newCastSpacer = { type = "header", order = 5.4, name = "" },
 		newCast = {
 			type = "execute", order = 5.5, name = "Create", desc = "Create a new Cast status.",
 			disabled = function() return not ParseSpellIds(newSpells) end,
 			func = function()
-				local status = AddCastStatus(ParseSpellIds(newSpells), newDuration)
+				local status = AddCastStatus(ParseSpellIds(newSpells), DEFAULT_DURATION)
 				if status then
 					newSpells = ""
 					Options:MakeStatusOptions(status)
@@ -298,6 +368,7 @@ end
 
 local function RegisterOptions()
 	local Options = Grid2Options
+	LibStub("AceGUI-3.0-Search-EditBox"):Register("Grid2Casts", Predictor)
 	Options:RegisterStatusCategory("cast", {
 		name = "Casts", title = "New Cast", order = 15, icon = CATEGORY_ICON,
 		desc = "Spell casts that leave no buff on the caster",

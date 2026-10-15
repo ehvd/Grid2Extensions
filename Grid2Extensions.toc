@@ -4,6 +4,7 @@
 ## Author: ehvd
 ## Version: @project-version@
 ## Category: Raid Frames
+## X-Curse-Project-ID: 1746293
 ## Dependencies: Grid2
 
 Grid2Extensions.lua

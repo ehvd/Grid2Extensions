@@ -165,7 +165,7 @@ local function BuildSpellOptions(args)
 	end
 end
 
-local function MakeOptions(self, _, options)
+local function MakeOptions(_, _, options)
 	local args = {}
 	options.add = {
 		type = "input", order = 10, name = "Add spell ID",

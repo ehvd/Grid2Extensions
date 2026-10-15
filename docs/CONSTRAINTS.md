@@ -5,7 +5,7 @@ Verified against the Grid2 2.9.33 source (Classic Era, Interface `11509`) on 202
 ## 1. The combat log has no event payload
 
 `COMBAT_LOG_EVENT_UNFILTERED` passes no arguments; read them with `CombatLogGetCurrentEventInfo()`. Spell IDs differ
-per rank in Classic, so every rank of a tracked spell needs its own entry in `TRACKED_SPELLS`.
+per rank in Classic, so every rank of a tracked spell needs its own entry in the tracked spell list.
 
 ## 2. Timers cannot be cancelled
 

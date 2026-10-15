@@ -7,14 +7,10 @@ local Grid2 = Grid2
 if not Grid2 then return end
 
 ---------------------------------------------------------------------------------------------------------------
--- Default spells, seeded into the saved settings once. After that, edit the list in game: Grid2 options >
--- Statuses > Combat > cast-tracker. The key is the spell ID (Classic has one ID per rank: list every rank).
---   duration = seconds the icon stays visible
---   texture  = optional; defaults to the spell's own icon (falls back to the question mark)
+-- No spells are tracked by default. Add them in game: Grid2 options > Statuses > Combat > cast-tracker.
+-- The list is stored in the status settings (dbx.spells): [spellID] = { duration = seconds, texture = optional }.
+-- Classic has one spell ID per rank, so add every rank you need.
 ---------------------------------------------------------------------------------------------------------------
-local DEFAULT_SPELLS = {
-	[1161] = { duration = 6, texture = "Interface\\Icons\\Ability_BullRush" }, -- Challenging Shout
-}
 local FALLBACK_TEXTURE = "Interface\\Icons\\INV_Misc_QuestionMark"
 
 local GetTime = GetTime
@@ -31,17 +27,9 @@ local status = Grid2.statusPrototype:new("cast-tracker")
 -- tokens change when the roster shuffles. Each timer callback only clears the entry it created.
 local active = {}
 
-local function CopySpells(src)
-	local copy = {}
-	for id, cfg in pairs(src) do copy[id] = { duration = cfg.duration, texture = cfg.texture } end
-	return copy
-end
-
--- The tracked spells live in the status settings (dbx.spells, edited in the Grid2 options). They are seeded from
--- DEFAULT_SPELLS once; after that the saved list is authoritative, so removing a default spell sticks.
 function status:UpdateDB()
 	local dbx = self.dbx
-	if not dbx.spells then dbx.spells = CopySpells(DEFAULT_SPELLS) end
+	if not dbx.spells then dbx.spells = {} end
 	self.spells = dbx.spells
 end
 
@@ -130,6 +118,9 @@ local function BuildSpellOptions(args)
 	local ids = {}
 	for id in pairs(status.spells) do ids[#ids + 1] = id end
 	table.sort(ids)
+	if #ids == 0 then
+		args.empty = { type = "description", order = 1, name = "No spells tracked yet. Enter a spell ID under Add spell ID." }
+	end
 	for i, id in ipairs(ids) do
 		local cfg = status.spells[id]
 		args["spell" .. id] = {
@@ -184,8 +175,8 @@ local function MakeOptions(_, _, options)
 		end,
 	}
 	options.reset = {
-		type = "execute", order = 11, name = "Reset to defaults",
-		confirm = true, confirmText = "Replace the tracked spell list with the defaults?",
+		type = "execute", order = 11, name = "Remove all spells",
+		confirm = true, confirmText = "Remove every tracked spell?",
 		func = function()
 			status.dbx.spells = nil
 			status:UpdateDB()

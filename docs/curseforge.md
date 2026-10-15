@@ -14,7 +14,7 @@
 
 ## Summary (max 250 characters)
 
-Extra statuses for Grid2 raid frames. Includes a Cast Tracker that shows an icon on a player's frame when they cast a spell that leaves no buff, such as Challenging Shout.
+Grid2 add-on that shows an icon on a raid frame when a player casts a buffless spell like Challenging Shout.
 
 ## Description
 

@@ -102,7 +102,7 @@ function status:GetColor()
 	return 1, 1, 1, 1
 end
 
-Grid2.setupFunc["cast-tracker"] = function(baseKey, dbx)
+Grid2.setupFunc["cast-tracker"] = function(baseKey, dbx) -- luacheck: ignore 122
 	Grid2:RegisterStatus(status, { "icon" }, baseKey, dbx)
 	return status
 end

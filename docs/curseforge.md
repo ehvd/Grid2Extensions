@@ -28,7 +28,7 @@ Shows an icon on a player's Grid2 frame for a few seconds after they successfull
 log. Meant for spells that put no buff on the caster, for example **Challenging Shout** (6 seconds).
 
 - Appears in the Grid2 options under **Statuses > Combat** as *cast-tracker*; link it to an icon indicator.
-- Spells, icons and durations are listed in one table at the top of `Grid2Extensions.lua`.
+- Add, remove and edit tracked spells (spell ID, duration, optional icon) in the status options; no file editing needed.
 - Recasting refreshes the icon; leaving the group clears it.
 
 ## Links

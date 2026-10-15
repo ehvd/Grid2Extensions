@@ -22,13 +22,13 @@ Grid2 add-on that shows an icon on a raid frame when a player casts a buffless s
 
 Small add-on modules for **Grid2** (Classic Era). Requires [Grid2](https://www.curseforge.com/wow/addons/grid2).
 
-## Cast Tracker
+## Casts
 
 Shows an icon on a player's Grid2 frame for a few seconds after they successfully cast a tracked spell, using the combat
 log. Meant for spells that put no buff on the caster, for example **Challenging Shout** (6 seconds).
 
-- Appears in the Grid2 options under **Statuses > Combat** as *cast-tracker*; link it to an icon indicator.
-- No spells are tracked by default: add the spell IDs you want (duration and icon are editable per spell) in the status options.
+- Create casts in the Grid2 options under **Statuses > Casts > New Cast**, the same way you create Buffs: enter one or more spell IDs or names (list every rank), a duration and create. Nothing is tracked by default.
+- Each cast is its own status with its own spell IDs, duration, optional icon, Load conditions and indicator links; delete it with the icon in its title.
 - Recasting refreshes the icon; leaving the group clears it.
 
 ## Links

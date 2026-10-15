@@ -10,6 +10,7 @@ if not Grid2 then return end
 local FALLBACK_TEXTURE = "Interface\\Icons\\INV_Misc_QuestionMark"
 local CATEGORY_ICON = "Interface\\Icons\\Ability_BullRush"
 local DEFAULT_DURATION = 6
+local WHITE = { r = 1, g = 1, b = 1, a = 1 }
 
 local GetTime = GetTime
 local GetSpellInfo = GetSpellInfo
@@ -105,6 +106,7 @@ function Cast:UpdateDB()
 	self.spellId = dbx.spellId
 	self.duration = dbx.duration or DEFAULT_DURATION
 	self.texture = dbx.texture
+	self.color = dbx.color1 or WHITE
 end
 
 function Cast:OnEnable()
@@ -176,8 +178,23 @@ function Cast:GetExpirationTime(unit)
 	return entry and entry.expires
 end
 
+-- Color indicators (square, border, bar color, text color...): the status color chosen in the options.
 function Cast:GetColor()
-	return 1, 1, 1, 1
+	local c = self.color
+	return c.r, c.g, c.b, c.a
+end
+
+-- Text indicators: the spell name (the text indicator can also show the remaining time by itself).
+function Cast:GetText()
+	return (GetSpellInfo(self.spellId or 0))
+end
+
+-- Bar / alpha indicators: remaining fraction of the duration.
+function Cast:GetPercent(unit)
+	local entry = self.active[UnitGUID(unit)]
+	if not entry then return 0 end
+	local left = (entry.expires - GetTime()) / entry.duration
+	return left > 0 and left or 0
 end
 
 local function CreateCast(baseKey, dbx)
@@ -186,7 +203,7 @@ local function CreateCast(baseKey, dbx)
 	status.active = {}
 	if not dbx.spellId and dbx.spellIds then dbx.spellId = dbx.spellIds[1] end -- pre-release format
 	dbx.spellIds = nil
-	Grid2:RegisterStatus(status, { "icon" }, baseKey, dbx)
+	Grid2:RegisterStatus(status, { "color", "icon", "text", "percent" }, baseKey, dbx)
 	return status
 end
 
@@ -200,7 +217,7 @@ local function AddCastStatus(spellId, duration, texture)
 	local statuses = Grid2.db.profile.statuses
 	if statuses[baseKey] then baseKey = baseKey .. "-" .. spellId end
 	if statuses[baseKey] then return end
-	local dbx = { type = "cast", spellId = spellId, duration = duration, texture = texture }
+	local dbx = { type = "cast", spellId = spellId, duration = duration, texture = texture, color1 = { r = 1, g = 1, b = 1, a = 1 } }
 	statuses[baseKey] = dbx
 	return CreateCast(baseKey, dbx), baseKey
 end
@@ -281,6 +298,8 @@ local function MakeStatusOptions(self, status, options)
 			return format("|T%s:20|t %s, |cff808080%d|r", icon or "", name or "Unknown spell", dbx.spellId or 0)
 		end,
 	}
+	if not dbx.color1 then dbx.color1 = { r = 1, g = 1, b = 1, a = 1 } end
+	self:MakeStatusColorOptions(status, options)
 	options.duration = {
 		type = "range", order = 20, name = "Duration (s)", min = 0.5, max = 60, step = 0.5,
 		desc = "How long the icon stays visible after the cast.",

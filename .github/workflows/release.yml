@@ -1,0 +1,27 @@
+name: Release
+
+# v1.2.3         -> CurseForge release
+# v1.2.3-beta.1  -> CurseForge beta
+# v1.2.3-alpha.1 -> CurseForge alpha
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    env:
+      CF_API_KEY: ${{ secrets.CF_API_KEY }}
+      GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Package and upload
+        uses: BigWigsMods/packager@v2
+

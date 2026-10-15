@@ -1,0 +1,9 @@
+## Interface: 11509
+## Title: Grid2 |cff9482c9Extensions|r
+## Notes: Extra statuses for Grid2 raid frames, starting with a cast tracker (e.g. Challenging Shout).
+## Author: ehvd
+## Version: @project-version@
+## Category: Raid Frames
+## Dependencies: Grid2
+
+Grid2Extensions.lua

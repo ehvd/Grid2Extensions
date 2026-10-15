@@ -1,0 +1,19 @@
+package-as: Grid2Extensions
+
+manual-changelog:
+  filename: CHANGELOG.md
+  markup-type: markdown
+
+
+ignore:
+  - docs
+  - Makefile
+  - local.mk
+  - .github
+  - .luacheckrc
+  - .editorconfig
+  - .gitattributes
+  - CONTRIBUTING.md
+  - README.md
+  - icon.png
+  - tests

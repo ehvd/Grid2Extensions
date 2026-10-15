@@ -54,7 +54,7 @@ end
 -- "1161, 694" or "Challenging Shout" -> { ids }. Returns nil, badToken when something is not a known spell.
 local function ParseSpellIds(text)
 	local ids = {}
-	for token in (text or ""):gmatch("[^,;]+") do
+	for token in tostring(text or ""):gmatch("[^,;]+") do
 		token = strtrim(token)
 		if token ~= "" then
 			local id = tonumber(token)
@@ -286,7 +286,8 @@ end
 function Predictor:GetValue(text, key)
 	if key then
 		local head = SplitLastToken(text)
-		return key, head .. key
+		local full = head .. key -- the first return value is what the widget hands to AceConfig, so it must be the whole text
+		return full, full
 	end
 	return text, text
 end

@@ -15,6 +15,7 @@ second cast during the duration is not cut short by the first timer.
 ## 3. Grid2 API used
 
 - `Grid2.statusPrototype:new`, `Grid2.setupFunc[type]`, `Grid2:RegisterStatus(status, {"icon"}, baseKey, dbx)`,
-  `Grid2:DbSetStatusDefaultValue`, `status:UpdateIndicators(unit)`, `Grid2:GetUnitOfGUID(guid)` (party/raid only).
+  `status:Inject`, `status:UpdateIndicators(unit)`, `Grid2:GetUnitOfGUID(guid)` (party/raid only).
 - Grid2 has no `GetUnitidByGUID` and no `Grid2:RegisterStatusType`; the names are different in this Grid2 version.
-- Grid2Options is load-on-demand; the options entry is registered on its `ADDON_LOADED`.
+- Grid2Options is load-on-demand: the "Casts" category, the `cast` status options and a wrapper of `GetStatusInfo` (for the spell icon in the tree) are registered on its `ADDON_LOADED`.
+- One `cast` status per tracked cast, all fed by one combat-log frame in this addon.

@@ -11,12 +11,13 @@ exclude_files = {
 -- Globals written by the addon (SavedVariables, slash commands, binding / XML referenced names)
 globals = {
     "Grid2", -- host addon; we add to Grid2.setupFunc
+    "Grid2Options", -- host options addon; we add its category and wrap GetStatusInfo
 }
 
 -- Globals only read by the addon (WoW API, Ace3 and shared libraries). Add what luacheck reports as
 -- "accessing undefined variable"; keep this list to things that really exist in the Classic Era client.
 read_globals = {
-    "Grid2Options", "CombatLogGetCurrentEventInfo",
+    "CombatLogGetCurrentEventInfo", "GetSpellSubtext",
     -- Lua / WoW extensions to the stdlib
     "strsplit", "strjoin", "strtrim", "strlower", "strupper", "strfind", "strmatch", "strsub",
     "strlen", "strrep", "gsub", "format", "tinsert", "tremove", "wipe", "tContains", "date", "time",

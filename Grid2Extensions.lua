@@ -1,7 +1,7 @@
 -- Grid2Extensions: extra statuses for Grid2.
 --
--- "cast": one status per tracked cast. It shows an icon on the caster's Grid2 frame for a few seconds after they
--- successfully cast one of the status' spells, for spells that leave no buff on the caster (Challenging Shout...).
+-- "cast": one status per tracked spell. It shows an icon on the caster's Grid2 frame for a few seconds after they
+-- successfully cast that spell, for spells that leave no buff on the caster (Challenging Shout...).
 -- Statuses are created in the Grid2 options under Statuses > Casts, the same way Buffs are.
 
 local Grid2 = Grid2
@@ -16,13 +16,13 @@ local GetSpellInfo = GetSpellInfo
 local UnitGUID = UnitGUID
 local C_Timer = C_Timer
 local CombatLogGetCurrentEventInfo = CombatLogGetCurrentEventInfo
-local pairs, ipairs, tonumber, tostring = pairs, ipairs, tonumber, tostring
+local pairs, tonumber, tostring = pairs, tonumber, tostring
 local strtrim, gsub = strtrim, gsub
-local table_concat, table_sort = table.concat, table.sort
+local table_sort = table.sort
 local wipe = wipe
 
 ---------------------------------------------------------------------------------------------------------------
--- Spell ID helpers
+-- Spell helpers
 ---------------------------------------------------------------------------------------------------------------
 
 -- Classic has no spell database API, so spell names are resolved from a lazily built index of the vanilla spell
@@ -51,30 +51,13 @@ local function FindSpellByName(name)
 	end
 end
 
--- "1161, 694" or "Challenging Shout" -> { ids }. Returns nil, badToken when something is not a known spell.
-local function ParseSpellIds(text)
-	local ids = {}
-	for token in tostring(text or ""):gmatch("[^,;]+") do
-		token = strtrim(token)
-		if token ~= "" then
-			local id = tonumber(token)
-			if id then
-				if not GetSpellInfo(id) then return nil, token end
-			else
-				id = FindSpellByName(token)
-				if not id then return nil, token end
-			end
-			ids[#ids + 1] = id
-		end
-	end
-	if #ids == 0 then return nil, text end
-	return ids
-end
-
-local function JoinSpellIds(ids)
-	local t = {}
-	for i, id in ipairs(ids or {}) do t[i] = tostring(id) end
-	return table_concat(t, ", ")
+-- "1161" or "Challenging Shout" -> spell ID, or nil when it is not a known spell.
+local function ParseSpell(text)
+	text = strtrim(tostring(text or ""))
+	if text == "" then return end
+	local id = tonumber(text)
+	if id then return GetSpellInfo(id) and id or nil end
+	return FindSpellByName(text)
 end
 
 ---------------------------------------------------------------------------------------------------------------
@@ -103,7 +86,7 @@ frame:SetScript("OnEvent", function(_, event)
 		if not statuses then return end
 		local unit = Grid2:GetUnitOfGUID(sourceGUID) -- nil unless the caster is in our party/raid
 		if not unit then return end
-		for status in pairs(statuses) do status:Trigger(sourceGUID, unit, spellID) end
+		for status in pairs(statuses) do status:Trigger(sourceGUID, unit) end
 	elseif event == "GROUP_ROSTER_UPDATE" then
 		for status in pairs(enabled) do status:Prune() end
 	else -- PLAYER_LOGOUT
@@ -112,21 +95,22 @@ frame:SetScript("OnEvent", function(_, event)
 end)
 
 ---------------------------------------------------------------------------------------------------------------
--- The "cast" status. dbx = { type = "cast", spellIds = { ... }, duration = seconds, texture = optional }
+-- The "cast" status. dbx = { type = "cast", spellId = id, duration = seconds, texture = optional }
 ---------------------------------------------------------------------------------------------------------------
 
 local Cast = {}
 
 function Cast:UpdateDB()
 	local dbx = self.dbx
-	self.spellIds = dbx.spellIds or {}
+	self.spellId = dbx.spellId
 	self.duration = dbx.duration or DEFAULT_DURATION
 	self.texture = dbx.texture
 end
 
 function Cast:OnEnable()
 	enabled[self] = true
-	for _, id in ipairs(self.spellIds) do
+	local id = self.spellId
+	if id then
 		bySpell[id] = bySpell[id] or {}
 		bySpell[id][self] = true
 	end
@@ -135,12 +119,10 @@ end
 
 function Cast:OnDisable()
 	enabled[self] = nil
-	for _, id in ipairs(self.spellIds) do
-		local statuses = bySpell[id]
-		if statuses then
-			statuses[self] = nil
-			if not next(statuses) then bySpell[id] = nil end
-		end
+	local statuses = bySpell[self.spellId]
+	if statuses then
+		statuses[self] = nil
+		if not next(statuses) then bySpell[self.spellId] = nil end
 	end
 	wipe(self.active) -- pending timers find no matching entry and do nothing
 	UpdateFrameEvents()
@@ -148,9 +130,9 @@ end
 
 -- Active icons by caster GUID. Keyed by GUID, not unit, because unit tokens change when the roster shuffles.
 -- Each timer only clears the entry it created, so a recast refreshes the icon instead of being cut short.
-function Cast:Trigger(guid, unit, spellID)
+function Cast:Trigger(guid, unit)
 	local duration = self.duration
-	local entry = { expires = GetTime() + duration, duration = duration, spellID = spellID }
+	local entry = { expires = GetTime() + duration, duration = duration }
 	self.active[guid] = entry
 	C_Timer.After(duration, function()
 		if self.active[guid] ~= entry then return end
@@ -173,16 +155,15 @@ function Cast:IsActive(unit)
 	return entry ~= nil and entry.expires > GetTime()
 end
 
--- Icon shown for this status: the configured texture, else the icon of the first spell.
-function Cast:GetTexture(spellID)
+-- Icon shown for this status: the configured texture, else the spell's own icon.
+function Cast:GetTexture()
 	if self.texture then return self.texture end
-	local _, _, icon = GetSpellInfo(spellID or self.spellIds[1] or 0)
+	local _, _, icon = GetSpellInfo(self.spellId or 0)
 	return icon or FALLBACK_TEXTURE
 end
 
 function Cast:GetIcon(unit)
-	local entry = self.active[UnitGUID(unit)]
-	return entry and self:GetTexture(entry.spellID)
+	return self.active[UnitGUID(unit)] and self:GetTexture()
 end
 
 function Cast:GetDuration(unit)
@@ -203,6 +184,8 @@ local function CreateCast(baseKey, dbx)
 	local status = Grid2.statusPrototype:new(baseKey, false) -- no AceEvent: events go through the shared frame
 	status:Inject(Cast)
 	status.active = {}
+	if not dbx.spellId and dbx.spellIds then dbx.spellId = dbx.spellIds[1] end -- pre-release format
+	dbx.spellIds = nil
 	Grid2:RegisterStatus(status, { "icon" }, baseKey, dbx)
 	return status
 end
@@ -210,14 +193,14 @@ end
 Grid2.setupFunc["cast"] = CreateCast -- luacheck: ignore 122
 
 -- Creates, stores and registers a new cast status. Returns the status, or nil if the spell is unknown.
-local function AddCastStatus(spellIds, duration, texture)
-	local spellName = GetSpellInfo(spellIds[1])
+local function AddCastStatus(spellId, duration, texture)
+	local spellName = spellId and GetSpellInfo(spellId)
 	if not spellName then return end
-	local baseKey = "cast-" .. gsub(spellName, "[ %.\"]", "")
+	local baseKey = gsub(spellName, "[ %.\"]", "")
 	local statuses = Grid2.db.profile.statuses
-	if statuses[baseKey] then baseKey = baseKey .. "-" .. spellIds[1] end
+	if statuses[baseKey] then baseKey = baseKey .. "-" .. spellId end
 	if statuses[baseKey] then return end
-	local dbx = { type = "cast", spellIds = spellIds, duration = duration, texture = texture }
+	local dbx = { type = "cast", spellId = spellId, duration = duration, texture = texture }
 	statuses[baseKey] = dbx
 	return CreateCast(baseKey, dbx), baseKey
 end
@@ -236,7 +219,7 @@ Grid2.setupFunc["cast-tracker"] = function(baseKey, dbx) -- luacheck: ignore 122
 		table_sort(ids)
 		for _, id in ipairs(ids) do
 			local cfg = dbx.spells[id]
-			AddCastStatus({ id }, cfg.duration, cfg.texture)
+			AddCastStatus(id, cfg.duration, cfg.texture)
 		end
 		statuses[baseKey] = nil
 	end)
@@ -246,49 +229,42 @@ end
 -- Grid2Options (load-on-demand): "Casts" category with a "New Cast" page, like Buffs
 ---------------------------------------------------------------------------------------------------------------
 
--- Suggestions while typing in a spell field (AceGUI-3.0-Search-EditBox predictor, the same widget Buffs use).
--- Works on the last comma-separated token, so several spells can be typed into one field.
+-- Suggestions while typing a spell name (AceGUI-3.0-Search-EditBox predictor, the same widget Buffs use).
 local Predictor = {}
 
-local function SplitLastToken(text)
-	local head, tail = strmatch(text or "", "^(.*[,;]%s*)(.-)$")
-	if not head then head, tail = "", text or "" end
-	return head, strtrim(tail)
+local function SpellLabel(id, name, icon)
+	local rank = GetSpellSubtext and GetSpellSubtext(id)
+	return format("|T%s:0|t%s%s, |cff808080%d|r", icon or "", name, rank and rank ~= "" and " (" .. rank .. ")" or "", id)
 end
 
 function Predictor:GetValues(text, values, max)
-	local _, token = SplitLastToken(text)
-	if token == "" then return end
-	local id = strmatch(token, "^%d+$") and tonumber(token)
+	text = strtrim(text or "")
+	if text == "" then return end
+	local id = strmatch(text, "^%d+$") and tonumber(text)
 	if id then
 		local name, _, icon = GetSpellInfo(id)
-		if name then values[id] = format("|T%s:0|t%s, |cff808080%d|r", icon or "", name, id) end
+		if name then values[id] = SpellLabel(id, name, icon) end
 		return
 	end
-	if #token < 2 then return end
+	if #text < 2 then return end
 	BuildIndex()
-	token = strlower(token)
-	local len = #token
+	text = strlower(text)
+	local len = #text
 	for i = 1, #indexIds do
-		if strsub(indexNames[i], 1, len) == token then
+		if strsub(indexNames[i], 1, len) == text then
 			local spellID = indexIds[i]
 			local name, _, icon = GetSpellInfo(spellID)
-			local rank = GetSpellSubtext and GetSpellSubtext(spellID)
-			values[spellID] = format("|T%s:0|t%s%s, |cff808080%d|r", icon or "", name,
-				rank and rank ~= "" and " (" .. rank .. ")" or "", spellID)
+			values[spellID] = SpellLabel(spellID, name, icon)
 			max = max - 1
 			if max == 0 then return end
 		end
 	end
 end
 
--- Called with the typed text and, when the user picks a suggestion, its key (the spell ID).
+-- Called with the typed text and, when the user picks a suggestion, its key (the spell ID). The first return value
+-- is what the widget hands to AceConfig, the second is the text shown in the box.
 function Predictor:GetValue(text, key)
-	if key then
-		local head = SplitLastToken(text)
-		local full = head .. key -- the first return value is what the widget hands to AceConfig, so it must be the whole text
-		return full, full
-	end
+	if key then return tostring(key), tostring(key) end
 	return text, text
 end
 
@@ -298,19 +274,11 @@ end
 
 local function MakeStatusOptions(self, status, options)
 	local dbx = status.dbx
-	options.spellIds = {
-		type = "input", dialogControl = "EditBoxGrid2Casts", order = 10, width = "full", name = "Spell IDs",
-		desc = "Spell IDs or names, separated by commas. Classic has one ID per rank, so list every rank.",
-		get = function() return JoinSpellIds(dbx.spellIds) end,
-		validate = function(_, v)
-			local ids, bad = ParseSpellIds(v)
-			if not ids then return "Unknown spell: " .. tostring(bad) end
-			return true
-		end,
-		set = function(_, v)
-			dbx.spellIds = ParseSpellIds(v)
-			status:Refresh()
-			self:MakeStatusOptions(status) -- the icon in the tree depends on the first spell
+	options.spell = {
+		type = "description", order = 10, fontSize = "medium",
+		name = function()
+			local name, _, icon = GetSpellInfo(dbx.spellId or 0)
+			return format("|T%s:20|t %s, |cff808080%d|r", icon or "", name or "Unknown spell", dbx.spellId or 0)
 		end,
 	}
 	options.duration = {
@@ -330,35 +298,32 @@ local function MakeStatusOptions(self, status, options)
 			v = strtrim(v)
 			dbx.texture = v ~= "" and (tonumber(v) or v) or nil
 			status:Refresh()
-			self:MakeStatusOptions(status)
+			self:MakeStatusOptions(status) -- the icon in the tree follows the texture
 		end,
 	}
 end
 
 local function MakeCategoryOptions(Options)
-	local newSpells = ""
+	local newSpell = ""
 	return {
-		newCastSpells = {
-			type = "input", dialogControl = "EditBoxGrid2Casts", order = 5, width = "full", name = "Spell IDs or names",
-			usage = "Start typing a spell name to get suggestions, or enter spell IDs. Separate several spells with commas.",
-			desc = "Spell IDs or names, separated by commas. Classic has one ID per rank, so list every rank.",
-			get = function() return newSpells end,
-			set = function(_, v) newSpells = v end,
+		newCastSpell = {
+			type = "input", dialogControl = "EditBoxGrid2Casts", order = 5, width = "full", name = "Spell ID or name",
+			usage = "Start typing a spell name to get suggestions, or enter a spell ID.",
+			get = function() return newSpell end,
+			set = function(_, v) newSpell = tostring(v) end,
 			validate = function(_, v)
-				if strtrim(v) == "" then return true end
-				local ids, bad = ParseSpellIds(v)
-				if not ids then return "Unknown spell: " .. tostring(bad) end
-				return true
+				if strtrim(tostring(v)) == "" or ParseSpell(v) then return true end
+				return "Unknown spell: " .. tostring(v)
 			end,
 		},
 		newCastSpacer = { type = "header", order = 5.4, name = "" },
 		newCast = {
 			type = "execute", order = 5.5, name = "Create", desc = "Create a new Cast status.",
-			disabled = function() return not ParseSpellIds(newSpells) end,
+			disabled = function() return not ParseSpell(newSpell) end,
 			func = function()
-				local status = AddCastStatus(ParseSpellIds(newSpells), DEFAULT_DURATION)
+				local status = AddCastStatus(ParseSpell(newSpell), DEFAULT_DURATION)
 				if status then
-					newSpells = ""
+					newSpell = ""
 					Options:MakeStatusOptions(status)
 					Options:SelectGroup("statuses", Options:GetStatusCategory(status), status.name)
 				end
@@ -377,7 +342,7 @@ local function RegisterOptions()
 	})
 	Options:RegisterStatusOptions("cast", "cast", MakeStatusOptions, {
 		title = "Cast", titleIcon = CATEGORY_ICON, isDeletable = true, groupOrder = 50,
-		titleDesc = "Shows an icon on a unit for a few seconds after it casts one of the spells.",
+		titleDesc = "Shows an icon on a unit for a few seconds after it casts the spell.",
 	})
 	-- Buffs get their tree icon from the spell; do the same for casts.
 	local GetStatusInfo = Options.GetStatusInfo

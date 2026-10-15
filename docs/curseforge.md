@@ -27,8 +27,8 @@ Small add-on modules for **Grid2** (Classic Era). Requires [Grid2](https://www.c
 Shows an icon on a player's Grid2 frame for a few seconds after they successfully cast a tracked spell, using the combat
 log. Meant for spells that put no buff on the caster, for example **Challenging Shout** (6 seconds).
 
-- Create casts in the Grid2 options under **Statuses > Casts > New Cast**, the same way you create Buffs: start typing a spell name for suggestions (or enter spell IDs, list every rank) and create; the duration is set in the status's own options (default 6 s). Nothing is tracked by default.
-- Each cast is its own status with its own spell IDs, duration, optional icon, Load conditions and indicator links; delete it with the icon in its title.
+- Create casts in the Grid2 options under **Statuses > Casts > New Cast**, the same way you create Buffs: start typing a spell name for suggestions (or enter a spell ID) and create. Nothing is tracked by default. One cast status tracks one spell ID; add one per rank if you need several.
+- Each cast is its own status with its own duration (default 6 s), optional icon, Load conditions and indicator links; delete it with the icon in its title.
 - Recasting refreshes the icon; leaving the group clears it.
 
 ## Links

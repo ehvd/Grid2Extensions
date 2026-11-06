@@ -11,6 +11,7 @@ exclude_files = {
 -- Globals written by the addon (SavedVariables, slash commands, binding / XML referenced names)
 globals = {
     "Grid2", -- host addon; we add to Grid2.setupFunc
+    "Grid2Extensions", -- public API table for WeakAuras and other addons
     "Grid2Options", -- host options addon; we add its category and wrap GetStatusInfo
 }
 

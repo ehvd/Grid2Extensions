@@ -4,6 +4,7 @@
 -- successfully cast that spell, for spells that leave no buff on the caster (Challenging Shout...).
 -- Statuses are created in the Grid2 options under Statuses > Casts, the same way Buffs are.
 
+local _, ns = ...
 local Grid2 = Grid2
 if not Grid2 then return end
 
@@ -372,15 +373,4 @@ local function RegisterOptions()
 	end
 end
 
-if Grid2Options then
-	RegisterOptions()
-else
-	local loader = CreateFrame("Frame")
-	loader:RegisterEvent("ADDON_LOADED")
-	loader:SetScript("OnEvent", function(self, _, addon)
-		if addon == "Grid2Options" and Grid2Options then
-			self:UnregisterEvent("ADDON_LOADED")
-			RegisterOptions()
-		end
-	end)
-end
+ns.OnGrid2Options(RegisterOptions)

@@ -5,6 +5,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 
 ## [Unreleased]
 
+### Added
+- `summon-request` status: active for everyone on the RaidSummon summon list, with icon, color and queue-position text (#12).
+
 ## [0.1.0] - 2026-10-15
 
 ### Added

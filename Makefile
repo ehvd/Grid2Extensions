@@ -14,7 +14,7 @@ VERSION   ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo de
 
 DEST          := $(ADDON_DIR)/$(ADDON)
 # Everything the game needs (no docs, CI files, tests). Plugin for Grid2: no embedded libraries.
-INSTALL_FILES := $(ADDON).toc Core.lua Casts.lua SummonRequest.lua LICENSE
+INSTALL_FILES := $(ADDON).toc Core.lua Casts.lua SummonRequest.lua Requests.lua LICENSE
 
 # PowerShell snippets (the path comes in through the T / S environment variables to survive spaces)
 PS_EXIT_IF_LINK  = if ((Test-Path -LiteralPath $$env:T) -and ((Get-Item -LiteralPath $$env:T -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)) { exit 1 }

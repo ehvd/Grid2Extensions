@@ -13,7 +13,6 @@ local CATEGORY_ICON = "Interface\\Icons\\Ability_BullRush"
 local DEFAULT_DURATION = 6
 local WHITE = { r = 1, g = 1, b = 1, a = 1 }
 
-local GetTime = GetTime
 local GetSpellInfo = GetSpellInfo
 local UnitGUID = UnitGUID
 local C_Timer = C_Timer
@@ -21,7 +20,6 @@ local CombatLogGetCurrentEventInfo = CombatLogGetCurrentEventInfo
 local pairs, tonumber, tostring = pairs, tonumber, tostring
 local strtrim, gsub = strtrim, gsub
 local table_sort = table.sort
-local wipe = wipe
 
 ---------------------------------------------------------------------------------------------------------------
 -- Spell helpers
@@ -73,27 +71,19 @@ local frame = CreateFrame("Frame")
 local function UpdateFrameEvents()
 	if next(enabled) then
 		frame:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
-		frame:RegisterEvent("GROUP_ROSTER_UPDATE")
-		frame:RegisterEvent("PLAYER_LOGOUT")
 	else
 		frame:UnregisterAllEvents()
 	end
 end
 
-frame:SetScript("OnEvent", function(_, event)
-	if event == "COMBAT_LOG_EVENT_UNFILTERED" then
-		local _, subevent, _, sourceGUID, _, _, _, _, _, _, _, spellID = CombatLogGetCurrentEventInfo()
-		if subevent ~= "SPELL_CAST_SUCCESS" or not sourceGUID then return end
-		local statuses = bySpell[spellID]
-		if not statuses then return end
-		local unit = Grid2:GetUnitOfGUID(sourceGUID) -- nil unless the caster is in our party/raid
-		if not unit then return end
-		for status in pairs(statuses) do status:Trigger(sourceGUID, unit) end
-	elseif event == "GROUP_ROSTER_UPDATE" then
-		for status in pairs(enabled) do status:Prune() end
-	else -- PLAYER_LOGOUT
-		for status in pairs(enabled) do wipe(status.active) end
-	end
+frame:SetScript("OnEvent", function()
+	local _, subevent, _, sourceGUID, _, _, _, _, _, _, _, spellID = CombatLogGetCurrentEventInfo()
+	if subevent ~= "SPELL_CAST_SUCCESS" or not sourceGUID then return end
+	local statuses = bySpell[spellID]
+	if not statuses then return end
+	local unit = Grid2:GetUnitOfGUID(sourceGUID) -- nil unless the caster is in our party/raid
+	if not unit then return end
+	for status in pairs(statuses) do status:Trigger(sourceGUID, unit, status.duration) end
 end)
 
 ---------------------------------------------------------------------------------------------------------------
@@ -112,6 +102,7 @@ end
 
 function Cast:OnEnable()
 	enabled[self] = true
+	self:Track()
 	local id = self.spellId
 	if id then
 		bySpell[id] = bySpell[id] or {}
@@ -122,40 +113,13 @@ end
 
 function Cast:OnDisable()
 	enabled[self] = nil
+	self:Untrack()
 	local statuses = bySpell[self.spellId]
 	if statuses then
 		statuses[self] = nil
 		if not next(statuses) then bySpell[self.spellId] = nil end
 	end
-	wipe(self.active) -- pending timers find no matching entry and do nothing
 	UpdateFrameEvents()
-end
-
--- Active icons by caster GUID. Keyed by GUID, not unit, because unit tokens change when the roster shuffles.
--- Each timer only clears the entry it created, so a recast refreshes the icon instead of being cut short.
-function Cast:Trigger(guid, unit)
-	local duration = self.duration
-	local entry = { expires = GetTime() + duration, duration = duration }
-	self.active[guid] = entry
-	C_Timer.After(duration, function()
-		if self.active[guid] ~= entry then return end
-		self.active[guid] = nil
-		local current = Grid2:GetUnitOfGUID(guid)
-		if current then self:UpdateIndicators(current) end
-	end)
-	self:UpdateIndicators(unit)
-end
-
--- Drop entries of players who left the group; their frames are gone, so no indicator update is needed.
-function Cast:Prune()
-	for guid in pairs(self.active) do
-		if not Grid2:GetUnitOfGUID(guid) then self.active[guid] = nil end
-	end
-end
-
-function Cast:IsActive(unit)
-	local entry = self.active[UnitGUID(unit)]
-	return entry ~= nil and entry.expires > GetTime()
 end
 
 -- Icon shown for this status: the configured texture, else the spell's own icon.
@@ -169,37 +133,15 @@ function Cast:GetIcon(unit)
 	return self.active[UnitGUID(unit)] and self:GetTexture()
 end
 
-function Cast:GetDuration(unit)
-	local entry = self.active[UnitGUID(unit)]
-	return entry and entry.duration
-end
-
-function Cast:GetExpirationTime(unit)
-	local entry = self.active[UnitGUID(unit)]
-	return entry and entry.expires
-end
-
--- Color indicators (square, border, bar color, text color...): the status color chosen in the options.
-function Cast:GetColor()
-	local c = self.color
-	return c.r, c.g, c.b, c.a
-end
-
 -- Text indicators: the spell name (the text indicator can also show the remaining time by itself).
 function Cast:GetText()
 	return (GetSpellInfo(self.spellId or 0))
 end
 
--- Bar / alpha indicators: remaining fraction of the duration.
-function Cast:GetPercent(unit)
-	local entry = self.active[UnitGUID(unit)]
-	if not entry then return 0 end
-	local left = (entry.expires - GetTime()) / entry.duration
-	return left > 0 and left or 0
-end
 
 local function CreateCast(baseKey, dbx)
 	local status = Grid2.statusPrototype:new(baseKey, false) -- no AceEvent: events go through the shared frame
+	status:Inject(ns.Timed)
 	status:Inject(Cast)
 	status.active = {}
 	if not dbx.spellId and dbx.spellIds then dbx.spellId = dbx.spellIds[1] end -- pre-release format

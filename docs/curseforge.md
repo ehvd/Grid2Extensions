@@ -30,6 +30,22 @@ Shows an indicator on a player's Grid2 frame for a few seconds after they succes
 - Each cast is its own status with its own duration (default 6 s), optional icon, Load conditions and indicator links; delete it with the icon in its title.
 - Recasting refreshes the icon; leaving the group clears it.
 
+## Requests
+
+Statuses that a **WeakAura** switches on for a group member, for example to see who asked for a Blessing of Protection.
+
+- Create them under **Statuses > Requests > New Request**: just a name. WeakAuras refer to the status by that name. Works with icon, color, text and bar indicators.
+- Drive a status from an aura's custom actions. The status stays on while the aura is shown:
+
+```lua
+-- On Show
+Grid2Extensions.Trigger("Bop", sender, 0)  -- 0 = until cleared
+-- On Hide
+Grid2Extensions.Clear("Bop", sender)
+```
+
+  `sender` is a unit token, a player name or a GUID of someone in your group. Leave out the last number of `Trigger` to use the status' own duration (0 by default, meaning until cleared); `Clear("Bop")` without a player clears everybody.
+
 ## Requesting Summon
 
 A status for group members who are on the summon list of the **RaidSummon** addon (optional): icon, color and text (queue position) indicators. It appears under Statuses > Miscellaneous as *summon-request*.

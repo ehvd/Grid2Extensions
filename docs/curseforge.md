@@ -32,10 +32,10 @@ Shows an indicator on a player's Grid2 frame for a few seconds after they succes
 
 ## Requests
 
-Statuses that a **whisper** or a **WeakAura** switches on for a group member, for example to see who asked for a Blessing of Protection.
+Statuses that a **WeakAura** switches on for a group member, for example to see who asked for a Blessing of Protection.
 
-- Create them under **Statuses > Requests > New Request**: a name and, optionally, the whisper text to react to (not case sensitive, Lua patterns optional). When someone in your group whispers you a matching message, the status shows on their frame for the duration you set (default 10 s). Works with icon, color, text and bar indicators.
-- **WeakAuras**: drive a status from an aura's custom actions. The status stays on while the aura is shown:
+- Create them under **Statuses > Requests > New Request**: just a name. WeakAuras refer to the status by that name. Works with icon, color, text and bar indicators.
+- Drive a status from an aura's custom actions. The status stays on while the aura is shown:
 
 ```lua
 -- On Show
@@ -44,7 +44,7 @@ Grid2Extensions.Trigger("Bop", sender, 0)  -- 0 = until cleared
 Grid2Extensions.Clear("Bop", sender)
 ```
 
-  `sender` is a unit token, a player name or a GUID of someone in your group. Leave out the last number of `Trigger` to use the status' own duration; `Clear("Bop")` without a player clears everybody.
+  `sender` is a unit token, a player name or a GUID of someone in your group. Leave out the last number of `Trigger` to use the status' own duration (0 by default, meaning until cleared); `Clear("Bop")` without a player clears everybody.
 
 ## Requesting Summon
 

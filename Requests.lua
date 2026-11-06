@@ -1,85 +1,47 @@
--- "request": a status that is switched on for a group member by a whisper or by another addon (WeakAuras).
+-- "request": a status that WeakAuras (or any other code) switches on for a group member.
 --
---  * Whisper: if the status has a pattern and a whisper to the player matches it, the status is shown on the
---    sender's Grid2 frame for the configured duration ("Bop me pls!!" -> a Blessing of Protection request).
---  * API: Grid2Extensions.Trigger(statusName, who [, seconds]) and Grid2Extensions.Clear(statusName [, who]) let a
---    WeakAura (or any code) drive the status, e.g. from the aura's On Show / On Hide custom actions.
+--   Grid2Extensions.Trigger(statusName, who [, seconds])   switch the status on for a player
+--   Grid2Extensions.Clear(statusName [, who])              switch it off again
 --
+-- A WeakAura drives it from its custom actions: Trigger in On Show and Clear in On Hide ties the status to the aura.
 -- Statuses are created in the Grid2 options under Statuses > Requests, the same way Buffs are.
 
 local _, ns = ...
 local Grid2 = Grid2
 if not Grid2 then return end
 
-local DEFAULT_DURATION = 10
+local DEFAULT_DURATION = 0 -- 0 = stays until Clear() is called
 local DEFAULT_TEXTURE = "Interface\\Icons\\INV_Misc_Note_01"
 local CATEGORY_ICON = "Interface\\Icons\\Spell_Holy_SealOfProtection"
 local WHITE = { r = 1, g = 1, b = 1, a = 1 }
 
 local UnitGUID = UnitGUID
-local pairs, pcall, type, tostring, tonumber = pairs, pcall, type, tostring, tonumber
-local strfind, strlower, strtrim, gsub, format = strfind, strlower, strtrim, gsub, format
+local pairs, type, tostring, tonumber = pairs, type, tostring, tonumber
+local strfind, strtrim, gsub, format = strfind, strtrim, gsub, format
 
 ---------------------------------------------------------------------------------------------------------------
--- The "request" status. dbx = { type = "request", pattern = text, usePattern = bool, duration = seconds,
--- texture = optional, color1 = color }. duration 0 = stays until Clear() is called (WeakAuras).
+-- The "request" status. dbx = { type = "request", duration = seconds, texture = optional, color1 = color }.
+-- duration 0 = stays until Clear() is called. Timing and per-unit state come from the shared ns.Timed mixin.
 ---------------------------------------------------------------------------------------------------------------
 
 local Request = {}
 local enabled = {} -- [status] = true, request statuses that currently have indicators
-local frame = CreateFrame("Frame")
-
-local function UpdateFrameEvents()
-	local wanted
-	for status in pairs(enabled) do
-		if status.pattern then wanted = true break end
-	end
-	if wanted then frame:RegisterEvent("CHAT_MSG_WHISPER") else frame:UnregisterAllEvents() end
-end
-
--- Plain mode: case-insensitive substring. Pattern mode: Lua pattern against the lowercased message.
-function Request:Matches(text)
-	local pattern = self.pattern
-	if not pattern then return false end
-	text = strlower(text)
-	if self.usePattern then
-		local ok, found = pcall(strfind, text, pattern)
-		return ok and found ~= nil
-	end
-	return strfind(text, strlower(pattern), 1, true) ~= nil
-end
-
--- CHAT_MSG_WHISPER payload: text, playerName, ..., guid is the 12th argument.
-frame:SetScript("OnEvent", function(_, _, text, _, _, _, _, _, _, _, _, _, _, guid)
-	if not text or not guid then return end
-	local unit = Grid2:GetUnitOfGUID(guid) -- nil unless the sender is in our party/raid
-	if not unit then return end
-	for status in pairs(enabled) do
-		if status:Matches(text) then status:Trigger(guid, unit, status.duration) end
-	end
-end)
 
 function Request:UpdateDB()
 	local dbx = self.dbx
-	local pattern = strtrim(dbx.pattern or "")
-	self.pattern = pattern ~= "" and pattern or nil
-	self.usePattern = dbx.usePattern
 	self.duration = dbx.duration or DEFAULT_DURATION
 	self.texture = dbx.texture
 	self.color = dbx.color1 or WHITE
-	if enabled[self] then UpdateFrameEvents() end
 end
 
 function Request:OnEnable()
 	enabled[self] = true
 	self:Track()
-	UpdateFrameEvents()
 end
 
 function Request:OnDisable()
 	enabled[self] = nil
 	self:Untrack()
-	UpdateFrameEvents()
 end
 
 -- Icon shown for this status: the configured texture, else a generic note icon.
@@ -97,7 +59,7 @@ function Request:GetText()
 end
 
 local function CreateRequest(baseKey, dbx)
-	local status = Grid2.statusPrototype:new(baseKey, false) -- no AceEvent: events go through the shared frame
+	local status = Grid2.statusPrototype:new(baseKey, false) -- no AceEvent needed
 	status:Inject(ns.Timed)
 	status:Inject(Request)
 	status.active = {}
@@ -112,15 +74,11 @@ local function KeyFromName(name)
 end
 
 -- Creates, stores and registers a new request status. Returns the status, or nil if the name is empty or taken.
-local function AddRequestStatus(name, pattern)
+local function AddRequestStatus(name)
 	local baseKey = KeyFromName(name)
 	local statuses = Grid2.db.profile.statuses
 	if baseKey == "" or statuses[baseKey] then return end
-	pattern = strtrim(pattern or "")
-	local dbx = {
-		type = "request", pattern = pattern ~= "" and pattern or nil, duration = DEFAULT_DURATION,
-		color1 = { r = 1, g = 1, b = 1, a = 1 },
-	}
+	local dbx = { type = "request", duration = DEFAULT_DURATION, color1 = { r = 1, g = 1, b = 1, a = 1 } }
 	statuses[baseKey] = dbx
 	return CreateRequest(baseKey, dbx), baseKey
 end
@@ -179,29 +137,10 @@ local function MakeStatusOptions(self, status, options)
 	local dbx = status.dbx
 	if not dbx.color1 then dbx.color1 = { r = 1, g = 1, b = 1, a = 1 } end
 	self:MakeStatusColorOptions(status, options)
-	options.pattern = {
-		type = "input", order = 20, width = "double", name = "Whisper text",
-		desc = "Show this status on the sender when a whisper to you contains this text (not case sensitive). "
-			.. "Leave empty to only use it from WeakAuras.",
-		get = function() return dbx.pattern or "" end,
-		set = function(_, v)
-			v = strtrim(v)
-			dbx.pattern = v ~= "" and v or nil
-			status:Refresh()
-		end,
-	}
-	options.usePattern = {
-		type = "toggle", order = 21, name = "Lua pattern",
-		desc = "Treat the whisper text as a Lua pattern, matched against the lowercased message (for example ^bop).",
-		get = function() return dbx.usePattern end,
-		set = function(_, v)
-			dbx.usePattern = v or nil
-			status:Refresh()
-		end,
-	}
 	options.duration = {
 		type = "range", order = 30, name = "Duration (s)", min = 0, max = 60, step = 0.5,
-		desc = "How long the status stays after a whisper. 0 keeps it until a WeakAura clears it.",
+		desc = "How long the status stays after a WeakAura triggers it without giving a duration. "
+			.. "0 keeps it until the WeakAura clears it.",
 		get = function() return dbx.duration or DEFAULT_DURATION end,
 		set = function(_, v)
 			dbx.duration = v
@@ -229,7 +168,7 @@ local function MakeStatusOptions(self, status, options)
 end
 
 local function MakeCategoryOptions(Options)
-	local newName, newPattern = "", ""
+	local newName = ""
 	return {
 		newRequestName = {
 			type = "input", order = 5, width = "full", name = "Name",
@@ -242,12 +181,6 @@ local function MakeCategoryOptions(Options)
 				return true
 			end,
 		},
-		newRequestPattern = {
-			type = "input", order = 5.1, width = "full", name = "Whisper text (optional)",
-			desc = "Show the status on the sender when a whisper to you contains this text (not case sensitive).",
-			get = function() return newPattern end,
-			set = function(_, v) newPattern = v end,
-		},
 		newRequestSpacer = { type = "header", order = 5.4, name = "" },
 		newRequest = {
 			type = "execute", order = 5.5, name = "Create", desc = "Create a new Request status.",
@@ -256,9 +189,9 @@ local function MakeCategoryOptions(Options)
 				return key == "" or Grid2.statuses[key] ~= nil
 			end,
 			func = function()
-				local status = AddRequestStatus(newName, newPattern)
+				local status = AddRequestStatus(newName)
 				if status then
-					newName, newPattern = "", ""
+					newName = ""
 					Options:MakeStatusOptions(status)
 					Options:SelectGroup("statuses", Options:GetStatusCategory(status), status.name)
 				end
@@ -271,11 +204,11 @@ ns.OnGrid2Options(function()
 	local Options = Grid2Options
 	Options:RegisterStatusCategory("request", {
 		name = "Requests", title = "New Request", order = 16, icon = CATEGORY_ICON,
-		desc = "Statuses switched on by a whisper or by WeakAuras",
+		desc = "Statuses switched on by WeakAuras",
 		options = MakeCategoryOptions(Options),
 	})
 	Options:RegisterStatusOptions("request", "request", MakeStatusOptions, {
 		title = "Request", titleIcon = CATEGORY_ICON, isDeletable = true, groupOrder = 50,
-		titleDesc = "Shown on a group member after a matching whisper, or while a WeakAura asks for it.",
+		titleDesc = "Shown on a group member while a WeakAura asks for it.",
 	})
 end)

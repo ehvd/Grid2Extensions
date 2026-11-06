@@ -6,7 +6,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 ## [Unreleased]
 
 ### Added
-- `request` statuses (Statuses > Requests): switched on by a matching whisper (shown on the sender) or by WeakAuras through `Grid2Extensions.Trigger` / `Grid2Extensions.Clear`; icon, color, text and bar indicators (#13).
+- `request` statuses (Statuses > Requests): switched on and off by WeakAuras through `Grid2Extensions.Trigger` / `Grid2Extensions.Clear`; icon, color, text and bar indicators (#13).
 - `summon-request` status: active for everyone on the RaidSummon summon list, with icon, color and queue-position text (#12).
 
 ## [0.1.0] - 2026-10-15

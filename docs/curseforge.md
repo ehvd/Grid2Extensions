@@ -30,6 +30,10 @@ Shows an indicator on a player's Grid2 frame for a few seconds after they succes
 - Each cast is its own status with its own duration (default 6 s), optional icon, Load conditions and indicator links; delete it with the icon in its title.
 - Recasting refreshes the icon; leaving the group clears it.
 
+## Requesting Summon
+
+A status for group members who are on the summon list of the **RaidSummon** addon (optional): icon, color and text (queue position) indicators. It appears under Statuses > Miscellaneous as *summon-request*.
+
 ## Links
 
 - Source and bug reports: https://github.com/ehvd/Grid2Extensions
